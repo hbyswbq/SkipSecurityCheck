@@ -13,7 +13,7 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
  * 搜狗输入法 Hook
  * - 解除剪贴板字数限制(原1000字符)
  * - 解除剪贴板条数限制(原100条)
- * - 禁用浮动模式自动开启
+ * - 解除键盘高度最大值限制
  */
 public class SogouClipboardHook {
 
@@ -24,7 +24,7 @@ public class SogouClipboardHook {
 
         hookWordLimit(param);
         hookItemCountLimit(param);
-        hookDisableFloatMode(param);
+        hookHeightLimit(param);
     }
 
     /**
@@ -145,31 +145,33 @@ public class SogouClipboardHook {
     }
 
     /**
-     * 禁用浮动模式自动开启
-     * 防止调整键盘高度到550dp以上时自动切换到浮动模式，导致键盘调节按钮消失
+     * 解除键盘高度最大值限制
+     * 原限制：竖屏最大高度 = 屏幕短边的87.5%（约550dp）
+     * 修改后：竖屏最大高度 = 屏幕短边的98%左右
      */
-    private static void hookDisableFloatMode(XC_LoadPackage.LoadPackageParam param) {
+    private static void hookHeightLimit(XC_LoadPackage.LoadPackageParam param) {
         try {
-            // Hook qp1.d(true) - 这个方法是设置浮动模式开关的
-            // 之前Hook错成了c()，现在修正为d()
-            Class<?> qp1Class = XposedHelpers.findClass("qp1", param.classLoader);
-            XposedBridge.hookAllMethods(qp1Class, "d", new XC_MethodHook() {
+            Class<?> resizeViewClass = XposedHelpers.findClass(
+                "com.sohu.inputmethod.ui.KeyboardResizePopupView",
+                param.classLoader
+            );
+
+            XposedBridge.hookAllMethods(resizeViewClass, "setKeyboardScale", new XC_MethodHook() {
                 @Override
-                protected void beforeHookedMethod(MethodHookParam hookParam) throws Throwable {
-                    if (hookParam.args.length > 0 && hookParam.args[0] instanceof Boolean) {
-                        boolean enable = (Boolean) hookParam.args[0];
-                        if (enable) {
-                            // 阻止开启浮动模式，但不阻止关闭
-                            hookParam.setResult(null);
-                            XposedBridge.log(TAG + " Blocked float mode enable (d(true))");
-                        }
-                    }
+                protected void afterHookedMethod(MethodHookParam hookParam) throws Throwable {
+                    // 原方法执行完后，修改最大高度字段 k
+                    // 竖屏原k = 0.875 * screenHeight，扩大到1.15倍
+                    Object thisObj = hookParam.thisObject;
+                    int k = XposedHelpers.getIntField(thisObj, "k");
+                    int newK = (int) (k * 1.15);
+                    XposedHelpers.setIntField(thisObj, "k", newK);
+                    XposedBridge.log(TAG + " Height max limit expanded: " + k + " -> " + newK);
                 }
             });
 
-            XposedBridge.log(TAG + " Float mode disable hook installed (d method)");
+            XposedBridge.log(TAG + " Keyboard height limit hook installed");
         } catch (Throwable e) {
-            XposedBridge.log(TAG + " hookDisableFloatMode failed: " + e.getMessage());
+            XposedBridge.log(TAG + " hookHeightLimit failed: " + e.getMessage());
         }
     }
 }
