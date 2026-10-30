@@ -10,18 +10,21 @@ import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
 /**
- * 搜狗输入法剪贴板解除限制 Hook
- * 去除单条字数限制(原1000字符)和历史条数限制(原100条)
+ * 搜狗输入法 Hook
+ * - 解除剪贴板字数限制(原1000字符)
+ * - 解除剪贴板条数限制(原100条)
+ * - 禁用浮动模式自动开启
  */
 public class SogouClipboardHook {
 
     private static final String TAG = "[SkipSecurityCheck][Sogou]";
 
     public static void init(XC_LoadPackage.LoadPackageParam param) {
-        XposedBridge.log(TAG + " Initializing clipboard hooks...");
+        XposedBridge.log(TAG + " Initializing Sogou hooks...");
 
         hookWordLimit(param);
         hookItemCountLimit(param);
+        hookDisableFloatMode(param);
     }
 
     /**
@@ -138,6 +141,34 @@ public class SogouClipboardHook {
             XposedBridge.log(TAG + " Item count limit hook installed (100 -> unlimited)");
         } catch (Throwable e) {
             XposedBridge.log(TAG + " hookItemCountLimit failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 禁用浮动模式自动开启
+     * 防止调整键盘高度时自动进入平板浮动模式导致高度锁定
+     */
+    private static void hookDisableFloatMode(XC_LoadPackage.LoadPackageParam param) {
+        try {
+            Class<?> qp1Class = XposedHelpers.findClass("qp1", param.classLoader);
+
+            XposedBridge.hookAllMethods(qp1Class, "c", new XC_MethodHook() {
+                @Override
+                protected void beforeHookedMethod(MethodHookParam hookParam) throws Throwable {
+                    // 只阻止开启浮动模式（参数为true时），不阻止关闭
+                    if (hookParam.args.length > 0 && hookParam.args[0] instanceof Boolean) {
+                        boolean enable = (Boolean) hookParam.args[0];
+                        if (enable) {
+                            hookParam.setResult(null);
+                            XposedBridge.log(TAG + " Blocked float mode auto-enable");
+                        }
+                    }
+                }
+            });
+
+            XposedBridge.log(TAG + " Float mode auto-disable hook installed");
+        } catch (Throwable e) {
+            XposedBridge.log(TAG + " hookDisableFloatMode failed: " + e.getMessage());
         }
     }
 }
