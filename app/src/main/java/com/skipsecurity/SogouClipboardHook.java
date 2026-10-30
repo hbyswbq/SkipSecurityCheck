@@ -13,6 +13,7 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
  * 搜狗输入法 Hook
  * - 解除剪贴板字数限制(原1000字符)
  * - 解除剪贴板条数限制(原100条)
+ * - 禁用浮动模式自动开启
  */
 public class SogouClipboardHook {
 
@@ -23,8 +24,7 @@ public class SogouClipboardHook {
 
         hookWordLimit(param);
         hookItemCountLimit(param);
-        // 临时禁用平板模式Hook，导致键盘打不开
-        // hookDisableFloatMode(param);
+        hookDisableFloatMode(param);
     }
 
     /**
@@ -145,10 +145,31 @@ public class SogouClipboardHook {
     }
 
     /**
-     * 禁用平板/浮动模式自动开启
-     * 临时禁用，导致键盘打不开
+     * 禁用浮动模式自动开启
+     * 防止调整键盘高度到550dp以上时自动切换到浮动模式，导致键盘调节按钮消失
      */
     private static void hookDisableFloatMode(XC_LoadPackage.LoadPackageParam param) {
-        // 临时禁用
+        try {
+            // Hook qp1.d(true) - 这个方法是设置浮动模式开关的
+            // 之前Hook错成了c()，现在修正为d()
+            Class<?> qp1Class = XposedHelpers.findClass("qp1", param.classLoader);
+            XposedBridge.hookAllMethods(qp1Class, "d", new XC_MethodHook() {
+                @Override
+                protected void beforeHookedMethod(MethodHookParam hookParam) throws Throwable {
+                    if (hookParam.args.length > 0 && hookParam.args[0] instanceof Boolean) {
+                        boolean enable = (Boolean) hookParam.args[0];
+                        if (enable) {
+                            // 阻止开启浮动模式，但不阻止关闭
+                            hookParam.setResult(null);
+                            XposedBridge.log(TAG + " Blocked float mode enable (d(true))");
+                        }
+                    }
+                }
+            });
+
+            XposedBridge.log(TAG + " Float mode disable hook installed (d method)");
+        } catch (Throwable e) {
+            XposedBridge.log(TAG + " hookDisableFloatMode failed: " + e.getMessage());
+        }
     }
 }
