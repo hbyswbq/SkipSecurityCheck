@@ -13,7 +13,6 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
  * 搜狗输入法 Hook
  * - 解除剪贴板字数限制(原1000字符)
  * - 解除剪贴板条数限制(原100条)
- * - 禁用浮动模式和大屏幕平板模式
  */
 public class SogouClipboardHook {
 
@@ -24,7 +23,8 @@ public class SogouClipboardHook {
 
         hookWordLimit(param);
         hookItemCountLimit(param);
-        hookDisableFloatMode(param);
+        // 临时禁用平板模式Hook，导致键盘打不开
+        // hookDisableFloatMode(param);
     }
 
     /**
@@ -146,35 +146,9 @@ public class SogouClipboardHook {
 
     /**
      * 禁用平板/浮动模式自动开启
-     * 防止调整键盘高度到550dp以上时自动切换模式导致高度锁定
+     * 临时禁用，导致键盘打不开
      */
     private static void hookDisableFloatMode(XC_LoadPackage.LoadPackageParam param) {
-        try {
-            // 1. Hook qp1.c(true) 阻止开启浮动模式
-            Class<?> qp1Class = XposedHelpers.findClass("qp1", param.classLoader);
-            XposedBridge.hookAllMethods(qp1Class, "c", new XC_MethodHook() {
-                @Override
-                protected void beforeHookedMethod(MethodHookParam hookParam) throws Throwable {
-                    if (hookParam.args.length > 0 && hookParam.args[0] instanceof Boolean) {
-                        boolean enable = (Boolean) hookParam.args[0];
-                        if (enable) {
-                            hookParam.setResult(null);
-                            XposedBridge.log(TAG + " Blocked float mode auto-enable");
-                        }
-                    }
-                }
-            });
-
-            // 2. 强制 LARGE_SCREEN_MODE_ENABLE = false，禁用大屏幕平板布局
-            Class<?> envClass = XposedHelpers.findClass(
-                "com.sohu.inputmethod.sogou.Environment",
-                param.classLoader
-            );
-            XposedHelpers.setStaticBooleanField(envClass, "LARGE_SCREEN_MODE_ENABLE", false);
-
-            XposedBridge.log(TAG + " Float mode & large screen disable hooks installed");
-        } catch (Throwable e) {
-            XposedBridge.log(TAG + " hookDisableFloatMode failed: " + e.getMessage());
-        }
+        // 临时禁用
     }
 }
