@@ -77,10 +77,11 @@ public class SogouClipboardHook {
 
             XposedBridge.hookAllMethods(innerCallbackClass, "a", new XC_MethodReplacement() {
                 @Override
+                @SuppressWarnings("unchecked")
                 protected Object replaceHookedMethod(MethodHookParam hookParam) throws Throwable {
-                    List<?> list = (List<?>) hookParam.args[0];
+                    List list = (List) hookParam.args[0];
                     if (list == null) {
-                        list = new java.util.ArrayList<>();
+                        list = new java.util.ArrayList();
                     }
 
                     // 获取外部类 hx0 实例
