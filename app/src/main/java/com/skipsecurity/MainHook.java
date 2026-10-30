@@ -10,12 +10,16 @@ public class MainHook implements IXposedHookLoadPackage {
 
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam param) {
-        if (!"com.android.packageinstaller".equals(param.packageName)) return;
-
-        XposedBridge.log("[SkipSecurityCheck] Hooking com.android.packageinstaller");
-
-        // bypass security check during install
-        enableCheckInstaller(param);
+        // 魅族安装包器：跳过安全检测
+        if ("com.android.packageinstaller".equals(param.packageName)) {
+            XposedBridge.log("[SkipSecurityCheck] Hooking com.android.packageinstaller");
+            enableCheckInstaller(param);
+        }
+        // 搜狗输入法魅族版：解除剪贴板字数和条数限制
+        else if ("com.sohu.inputmethod.sogou.meizu".equals(param.packageName)) {
+            XposedBridge.log("[SkipSecurityCheck] Hooking Sogou Input Method (Meizu)");
+            SogouClipboardHook.init(param);
+        }
     }
 
     private void enableCheckInstaller(XC_LoadPackage.LoadPackageParam param) {
