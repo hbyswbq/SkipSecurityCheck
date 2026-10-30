@@ -13,7 +13,7 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
  * 搜狗输入法 Hook
  * - 解除剪贴板字数限制(原1000字符)
  * - 解除剪贴板条数限制(原100条)
- * - 解除键盘高度最大值限制
+ * - 禁用大屏幕平板模式判断
  */
 public class SogouClipboardHook {
 
@@ -24,7 +24,7 @@ public class SogouClipboardHook {
 
         hookWordLimit(param);
         hookItemCountLimit(param);
-        hookHeightLimit(param);
+        hookDisableLargeScreen(param);
     }
 
     /**
@@ -145,33 +145,33 @@ public class SogouClipboardHook {
     }
 
     /**
-     * 解除键盘高度最大值限制
-     * 原限制：竖屏最大高度 = 屏幕短边的87.5%（约550dp）
-     * 修改后：竖屏最大高度 = 屏幕短边的98%左右
+     * 禁用大屏幕平板模式判断
+     * Hook Environment.m3486e() 永远返回false，
+     * 这样就不会因为屏幕宽度/键盘高度超过550dp而自动切换到平板模式，
+     * "键盘调节"按钮也会一直保留。
      */
-    private static void hookHeightLimit(XC_LoadPackage.LoadPackageParam param) {
+    private static void hookDisableLargeScreen(XC_LoadPackage.LoadPackageParam param) {
         try {
-            Class<?> resizeViewClass = XposedHelpers.findClass(
-                "com.sohu.inputmethod.ui.KeyboardResizePopupView",
+            Class<?> envClass = XposedHelpers.findClass(
+                "com.sohu.inputmethod.sogou.Environment",
                 param.classLoader
             );
 
-            XposedBridge.hookAllMethods(resizeViewClass, "setKeyboardScale", new XC_MethodHook() {
-                @Override
-                protected void afterHookedMethod(MethodHookParam hookParam) throws Throwable {
-                    // 原方法执行完后，修改最大高度字段 k
-                    // 竖屏原k = 0.875 * screenHeight，扩大到1.15倍
-                    Object thisObj = hookParam.thisObject;
-                    int k = XposedHelpers.getIntField(thisObj, "k");
-                    int newK = (int) (k * 1.15);
-                    XposedHelpers.setIntField(thisObj, "k", newK);
-                    XposedBridge.log(TAG + " Height max limit expanded: " + k + " -> " + newK);
+            XposedHelpers.findAndHookMethod(
+                envClass,
+                "m3486e",
+                android.content.Context.class,
+                new XC_MethodReplacement() {
+                    @Override
+                    protected Object replaceHookedMethod(MethodHookParam hookParam) throws Throwable {
+                        return false;  // 永远返回false，不是大屏幕
+                    }
                 }
-            });
+            );
 
-            XposedBridge.log(TAG + " Keyboard height limit hook installed");
+            XposedBridge.log(TAG + " Large screen mode disabled (m3486e -> false)");
         } catch (Throwable e) {
-            XposedBridge.log(TAG + " hookHeightLimit failed: " + e.getMessage());
+            XposedBridge.log(TAG + " hookDisableLargeScreen failed: " + e.getMessage());
         }
     }
 }
