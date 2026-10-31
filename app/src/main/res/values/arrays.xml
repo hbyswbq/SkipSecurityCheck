@@ -2,6 +2,5 @@
 <resources>
     <string-array name="default_scope">
         <item>com.android.packageinstaller</item>
-        <item>com.sohu.inputmethod.sogou.meizu</item>
     </string-array>
 </resources>
